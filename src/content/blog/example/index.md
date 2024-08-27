@@ -12,3 +12,22 @@ draft: true
 ---
 
 # example 
+
+```text
+---
+title: 'example'
+description: 'Default'
+pubDate: 2024-8-25
+tags: ["Default"]
+updatedDate: 'Sep 10 2022'
+series: "Default"
+draft: true
+---
+```
+
+
+
+
+
+
+
