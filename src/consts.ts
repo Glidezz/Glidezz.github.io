@@ -46,7 +46,7 @@ export const socialLinks: Array<SocialLink> = [
   {
     icon: "mdi:email",
     friendlyName: "email",
-    link: "eliaukz07@gmail.com",
+    link: "mailto:eliaukz07@gmail.com",
   },
   {
     icon: "mdi:rss",
