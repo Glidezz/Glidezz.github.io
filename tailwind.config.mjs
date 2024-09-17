@@ -4,6 +4,8 @@ export default {
 	darkMode: "class",
 	theme: {
 		fontFamily: {
+			'sans': ['SimSun', 'Times New Roman', 'serif'],
+			'serif': ['SimHei', 'Serif'],
 			'mono': ['Space Mono', 'monospace']
 		},
 		extend: {
