@@ -4,19 +4,21 @@ description: ...
 pubDate: 2024-9-17
 series: pa
 ---
-# background
+# ICS2019
+
+## background
 
 website--[Introduction · GitBook (nju-projectn.github.io)](https://nju-projectn.github.io/ics-pa-gitbook/ics2019/)
 
-# pa1
+## pa1
 
-## 表达式求值
+### 表达式求值
 
 [表达式求值 · GitBook (nju-projectn.github.io)](https://nju-projectn.github.io/ics-pa-gitbook/ics2019/1.5.html)
 
 这里要求我们实现表达式求值，但是使用的方式是利用编译原理中的知识完成。
 
-### 正则表达式
+#### 正则表达式
 
 首先我们要实现利用正则表达式来对我们的字符串进行解析
 
@@ -67,9 +69,9 @@ static struct rule {
 
 这里我的代码支持基本的四则运算，逻辑运算，支持十进制整数和十六进制整数和寄存器。
 
-### 框架代码
+#### 框架代码
 
-#### make_token
+##### make_token
 
 框架代码在调用expr实现计算首先调用make_token来生成tokens。这里如果匹配到整数或寄存器时，除了要保存token还要讲原有的字符串拷贝进tokens数组中，这样才可以完成后续的parse操作。
 
@@ -101,7 +103,7 @@ static bool make_token(char *e) {
 
 **这里有个小细节就是在匹配正则表达式时，我们要优先进行十六进制的匹配，然后再进行十进制的匹配，否则就会出现将0匹配成十进制而其余部分无法匹配的情况。**
 
-#### eval
+##### eval
 
 最重要的就是eval的实现。流程如下。
 
@@ -128,14 +130,14 @@ eval(p, q) {
 }
 ```
 
-#### check_parentheses
+##### check_parentheses
 
 check_parentheses的作用是检查子式的括号是否匹配，这里我将子式分为了三种情况
 1. (expr)   此情况是可以正常计算的。只需要计算eval(p+1, q-1)即可。
 2. bad expr 这种情况无需继续计算，返回错误即可。
 3. expr 这种情况是我们想要看见的局势，对其进行计算即可。
 
-#### findMainOp
+##### findMainOp
 
 在得到一个单独的表达式时，要对其进行计算我们要先找到他的"主运算符"。
 
@@ -147,7 +149,7 @@ check_parentheses的作用是检查子式的括号是否匹配，这里我将子
 
 要找出主运算符, 只需要将token表达式全部扫描一遍, 就可以按照上述方法唯一确定主运算符.
 
-#### parse
+##### parse
 
 在得到单个表达式后，我们要对其进行运算，如果是十进制或十六进制，利用`strtol`即可完成。如果是寄存器类型，我们要通过调用` isa_reg_str2val`函数实现对cpu的访问。
 
@@ -178,7 +180,7 @@ int parse(Token tk) {
 ```
 
 
-### 单目运算符
+#### 单目运算符
 
 我这里单目运算符只支持正负，不支持取反或逻辑非。~~下次一定~~
 
@@ -225,6 +227,54 @@ uint32_t expr(char *e, bool *success) {
 
 至此就大概完成了表达式计算的全部要求。
 
+### watchpoint
 
+检查点的关键是完成存储WP的链表。每个节点要保存
+* 表达式，用于计算
+* enable 表示是否可用
+* 值 为了值是否发生变化，因此需要存储新旧两个值
+* next
+
+同时完成新建，删除，free，打印，计算检查点的功能。
+
+```c
+
+typedef struct watchpoint {
+  int NO;
+  struct watchpoint *next;
+  char* expression;
+  uint32_t value;
+  uint32_t old_value;
+  bool enable;
+
+} WP;
+
+WP* new_wp();
+void free_wp(WP*);
+bool delete_wp(int);
+bool change_wp();
+void print_wp();
+
+```
+
+在初始化时，初始化32个watchpoint。保存在空闲链表free_中。每次申请一个，就将其使用头插法从free_中取下，插入head中。free时同理，从head中取下，头插法插入free_中。
+
+根据提示，在每执行完一步运算后，要检查检查点的值是否发生变化，如果发生变化，就将cpu的状态设置为`NEMU_STOP`，在cpu_exec()中完成检查。
+
+```c
+
+/* Simulate how the CPU works. */
+void cpu_exec(uint64_t n) {
+  log_clearbuf();
+
+    /* TODO: check watchpoints here. */
+    if(change_wp()){
+      nemu_state.state = NEMU_STOP;
+      print_wp();
+    }
+}
+```
+
+这样就完成了检查点的功能。
 
 
