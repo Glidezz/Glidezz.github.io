@@ -2,5 +2,6 @@
   "showLineNumber": true,
   "newFileLocation": "current",
   "useMarkdownLinks": true,
-  "attachmentFolderPath": "./attachments"
+  "attachmentFolderPath": "./attachments",
+  "alwaysUpdateLinks": true
 }
