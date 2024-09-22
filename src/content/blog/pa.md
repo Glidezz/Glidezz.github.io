@@ -390,8 +390,500 @@ jalr可以调用地址是动态计算出来的函数，或者也可以实现调�
 
 ### dummy.c
 
+查看反汇编代码
+```
+Disassembly of section .text:
+
+80100000 <_start>:
+80100000:	00000413          	li	s0,0
+80100004:	00009117          	auipc	sp,0x9
+80100008:	ffc10113          	addi	sp,sp,-4 # 80109000 <_end>
+8010000c:	00c000ef          	jal	ra,80100018 <_trm_init>
+
+Disassembly of section .text.startup:
+
+80100010 <main>:
+80100010:	00000513          	li	a0,0
+80100014:	00008067          	ret
+
+Disassembly of section .text._trm_init:
+
+80100018 <_trm_init>:
+80100018:	80000537          	lui	a0,0x80000
+8010001c:	ff010113          	addi	sp,sp,-16
+80100020:	00050513          	mv	a0,a0
+80100024:	00112623          	sw	ra,12(sp)
+80100028:	fe9ff0ef          	jal	ra,80100010 <main>
+8010002c:	00050513          	mv	a0,a0
+80100030:	0000006b          	0x6b
+80100034:	0000006f          	j	80100034 <_trm_init+0x1c>
+
+```
+
+我们需要实现li，auipc，addi，jal，ret，lui，mv，sw，j等指令。
+
+继续查看手册，我们可以发现 li 指令是 lui 和 addi 指令的组合，因此不需 要单独实现；最后的 ret 指令是伪指令，其实需要实现的是 jalr；mv 指令也是伪 指令，会被扩展成 addi rd, rs1, 0，不需要单独实现。那么我们在本部分只需要实 现 li、auipc、addi、jal、jalr 即可。
+
+首先可以实现全部译码的程序
+
+```c
+#include "cpu/decode.h"
+
+#include "rtl/rtl.h"
+
+  
+
+// decode operand helper
+
+#define make_DopHelper(name) void concat(decode_op_, name) (Operand *op, uint32_t val, bool load_val)
+
+  
+
+static inline make_DopHelper(i) {
+  op->type = OP_TYPE_IMM;
+  op->imm = val;
+  rtl_li(&op->val, op->imm);
+  print_Dop(op->str, OP_STR_SIZE, "%d", op->imm);
+}
+
+static inline make_DopHelper(r) {
+  op->type = OP_TYPE_REG;
+  op->reg = val;
+  if (load_val) {
+    rtl_lr(&op->val, op->reg, 4);
+  }
+  print_Dop(op->str, OP_STR_SIZE, "%s", reg_name(op->reg, 4));
+}
+
+make_DHelper(U) {
+  decode_op_i(id_src, decinfo.isa.instr.imm31_12 << 12, true);
+  decode_op_r(id_dest, decinfo.isa.instr.rd, false);
+  print_Dop(id_src->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.imm31_12);
+}
+
+make_DHelper(I){
+  decode_op_r(id_src, decinfo.isa.instr.rs1, true);
+  decode_op_i(id_src2, decinfo.isa.instr.simm11_0, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.rs1);
+  print_Dop(id_src2->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.simm11_0);
+  decode_op_r(id_dest, decinfo.isa.instr.rd, false);
+}
+
+make_DHelper(J){
+  int32_t offset =
+      (decinfo.isa.instr.simm20 << 20) | (decinfo.isa.instr.imm19_12 << 12) |
+      (decinfo.isa.instr.imm11_ << 11) | (decinfo.isa.instr.imm10_1 << 1);
+  decode_op_i(id_src, offset, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "0x%x", offset);
+  decode_op_r(id_dest, decinfo.isa.instr.rd, false);
+}
+
+make_DHelper(B){
+  decode_op_r(id_src, decinfo.isa.instr.rs1, true);
+  decode_op_r(id_src2, decinfo.isa.instr.rs2, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.rs1);
+  print_Dop(id_src2->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.rs2);
+  int32_t offset =
+      (decinfo.isa.instr.simm12 << 12) | (decinfo.isa.instr.imm11 << 11) |
+      (decinfo.isa.instr.imm10_5 << 5) | (decinfo.isa.instr.imm4_1 << 1);
+  decode_op_i(id_dest, offset, true);
+}
+
+  
+
+make_DHelper(R){
+  decode_op_r(id_src, decinfo.isa.instr.rs1, true);
+  decode_op_r(id_src2, decinfo.isa.instr.rs2, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.rs1);
+  print_Dop(id_src2->str, OP_STR_SIZE, "0x%x", decinfo.isa.instr.rs2);
+  decode_op_r(id_dest,decinfo.isa.instr.rd,false);
+}
+
+make_DHelper(ld) {
+  decode_op_r(id_src, decinfo.isa.instr.rs1, true);
+  decode_op_i(id_src2, decinfo.isa.instr.simm11_0, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "%d(%s)", id_src2->val, reg_name(id_src->reg, 4));
+  rtl_add(&id_src->addr, &id_src->val, &id_src2->val);
+  decode_op_r(id_dest, decinfo.isa.instr.rd, false);
+}
+
+  
+make_DHelper(st) {
+  decode_op_r(id_src, decinfo.isa.instr.rs1, true);
+  int32_t simm = (decinfo.isa.instr.simm11_5 << 5) | decinfo.isa.instr.imm4_0;
+  decode_op_i(id_src2, simm, true);
+  print_Dop(id_src->str, OP_STR_SIZE, "%d(%s)", id_src2->val, reg_name(id_src->reg, 4));
+  rtl_add(&id_src->addr, &id_src->val, &id_src2->val);
+  decode_op_r(id_dest, decinfo.isa.instr.rs2, true);
+}
+```
+
+然后填写op_code_table完成执行部分的代码
+
+```c
+#include "cpu/exec.h"
+
+make_EHelper(lui) {
+  rtl_sr(id_dest->reg, &id_src->val, 4);
+
+  print_asm_template2(lui);
+}
+
+make_EHelper(auipc){
+  rtl_add(&id_dest->val, &cpu.pc, &id_src->val);
+  rtl_sr(id_dest->reg, &id_dest->val, 4);
+
+  print_asm_template2(auipc);
+}
+
+
+make_EHelper(imm){
+  switch(decinfo.isa.instr.funct3){
+    case 0:                                              // addi
+      rtl_add(&id_dest->val, &id_src->val, &id_src2->val);
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(addi);
+      break;
+    case 1:                                               //slli
+      rtl_shl(&id_dest->val, &id_src->val, &id_src2->reg);
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(slli);
+      break;
+    case 2:                                                 //slti
+      id_dest->val = (signed)id_src->val < (signed)id_src2->val;
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(slti);
+      break;
+    case 3:                                              //sltiu
+      id_dest->val = (unsigned)id_src->val < (unsigned)id_src2->val;
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(sltiu);
+      break;
+    case 4:                                              //xori
+      rtl_xor(&id_dest->val, &id_src->val, &id_src2->val);
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(xori);
+      break;
+    case 5:                                             // srli&&srai
+      if (decinfo.isa.instr.funct7 == 0b0000000) {    // srli
+        rtl_shr(&id_dest->val,&id_src->val,&id_src2->reg);
+        rtl_sr(id_dest->reg,&id_dest->val,4);
+        print_asm_template2(srli);
+      } else if (decinfo.isa.instr.funct7 == 0b0100000) {  // srai
+        rtl_sar(&id_dest->val, &id_src->val, &id_src2->reg);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template2(srai);
+      }
+      break;
+    case 6:                                               // ori
+      rtl_or(&id_dest->val, &id_src->val, &id_src2->val);
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(ori);
+      break;
+    case 7:                                             // andi
+      rtl_and(&id_dest->val, &id_src->val, &id_src2->val);
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template2(andi);
+      break;
+  }
+}
 
 
 
 
+make_EHelper(reg){
+  switch (decinfo.isa.instr.funct3) {
+    case 0:                                       // add  &&  sub  &&  mul
+      if (decinfo.isa.instr.funct7 == 0b0000000) {        // add
+        rtl_add(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(add);
+      } else if (decinfo.isa.instr.funct7 == 0b0100000) {  // sub
+        rtl_sub(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(sub);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {  // mul
+        rtl_imul_lo(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(mul);
+      }
+      break;
+    case 1:                                             // sll&&mulh
+      if (decinfo.isa.instr.funct7 == 0b0000000) {        // sll
+        rtl_shl(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(sll);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {  // mulh
+        rtl_imul_hi(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(mulh);
+      }
+      break;
+    case 2:                                                  // slt
+      id_dest->val = (signed)id_src->val < (signed)id_src2->val;
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template3(slt);
+      break;
+    case 3:                                               // sltu
+      id_dest->val = (unsigned)id_src->val < (unsigned)id_src2->val;
+      rtl_sr(id_dest->reg, &id_dest->val, 4);
+      print_asm_template3(sltu);
+      break;
+    case 4:                                              // xor&&div
+      if (decinfo.isa.instr.funct7 == 0b0000000) {          // xor
+        rtl_xor(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(xor);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {   // div
+        rtl_idiv_q(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(div);
+      }
+      break;
+    case 5:                                           // srl&&sra&&divu
+      if (decinfo.isa.instr.funct7 == 0b0000000) {    // srl
+        rtl_shr(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template2(srl);
+      } else if (decinfo.isa.instr.funct7 == 0b0100000) {  // sra
+        rtl_sar(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template2(sra);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {  // divu
+        rtl_div_q(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(divu);
+      }
+      break;
+    case 6:                                         // or&&rem
+      if (decinfo.isa.instr.funct7 == 0b0000000) {  // or
+        rtl_or(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(or);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {  // rem
+        rtl_idiv_r(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(rem);
+      }
+      break;
+    case 7:                                        // and&&remu
+      if (decinfo.isa.instr.funct7 == 0b0000000) {  // and
+        rtl_and(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(and);
+      } else if (decinfo.isa.instr.funct7 == 0b0000001) {  // remu
+        rtl_div_r(&id_dest->val, &id_src->val, &id_src2->val);
+        rtl_sr(id_dest->reg, &id_dest->val, 4);
+        print_asm_template3(remu);
+      }
+      break;
+  }
+}
+```
 
+
+
+
+```c
+#include "cpu/exec.h"
+
+
+
+make_EHelper(jal) {
+  uint32_t addr = cpu.pc + 4;
+  rtl_sr(id_dest->reg, &addr, 4);
+  rtl_add(&decinfo.jmp_pc, &cpu.pc, &id_src->val);
+  rtl_j(decinfo.jmp_pc);
+
+  print_asm_template2(jal);
+}
+
+make_EHelper(jalr){
+  uint32_t addr = cpu.pc + 4;
+  rtl_sr(id_dest->reg, &addr, 4);
+  decinfo.jmp_pc = (id_src->val + id_src2->val) & ~1;
+  rtl_j(decinfo.jmp_pc);
+
+  difftest_skip_dut(1, 2);  // difftest
+
+  print_asm_template2(jalr);
+}
+
+
+
+make_EHelper(branch){
+  decinfo.jmp_pc = cpu.pc + id_dest->val;
+  switch (decinfo.isa.instr.funct3) {
+    case 0:                                                            // beq
+      rtl_jrelop(RELOP_EQ, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(beq);
+      break;
+    case 1:                                                            // bne
+      rtl_jrelop(RELOP_NE, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(bne);
+      break;
+    case 4:                                                            // blt
+      rtl_jrelop(RELOP_LT, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(blt);
+      break;
+    case 5:                                                           // bge
+      rtl_jrelop(RELOP_GE, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(bge);
+      break;
+    case 6:                                                           // bltu
+      rtl_jrelop(RELOP_LTU, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(bltu);
+      break;
+    case 7:                                                           // bgeu
+      rtl_jrelop(RELOP_GEU, &id_src->val, &id_src2->val, decinfo.jmp_pc);
+      print_asm_template2(bgeu);
+      break;
+  }
+}
+
+```
+
+
+
+```c
+#include "cpu/exec.h"
+#include "all-instr.h"
+
+static OpcodeEntry load_table [8] = {
+  EX(lb), EX(lh), EXW(ld, 4), EMPTY, EXW(ld,1), EXW(ld,2), EMPTY, EMPTY
+};
+
+static make_EHelper(load) {
+  decinfo.width = load_table[decinfo.isa.instr.funct3].width;
+  idex(pc, &load_table[decinfo.isa.instr.funct3]);
+}
+
+static OpcodeEntry store_table [8] = {
+  EXW(st,1), EXW(st,2), EXW(st, 4), EMPTY, EMPTY, EMPTY, EMPTY, EMPTY
+};
+
+static make_EHelper(store) {
+  decinfo.width = store_table[decinfo.isa.instr.funct3].width;
+  idex(pc, &store_table[decinfo.isa.instr.funct3]);
+}
+
+static OpcodeEntry opcode_table [32] = {
+  /* b00 */ IDEX(ld, load), EMPTY, EMPTY, EMPTY, IDEX(I, imm), IDEX(U, auipc), EMPTY, EMPTY,
+  /* b01 */ IDEX(st, store), EMPTY, EMPTY, EMPTY, IDEX(R, reg), IDEX(U, lui), EMPTY, EMPTY,
+  /* b10 */ EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+  /* b11 */ IDEX(B, branch), IDEX(I, jalr), EX(nemu_trap), IDEX(J, jal), EMPTY, EMPTY, EMPTY, EMPTY,
+};
+
+void isa_exec(vaddr_t *pc) {
+  decinfo.isa.instr.val = instr_fetch(pc, 4);
+  assert(decinfo.isa.instr.opcode1_0 == 0x3);
+  idex(pc, &opcode_table[decinfo.isa.instr.opcode6_2]);
+}
+
+```
+
+
+```c
+#include "cpu/exec.h"
+
+make_EHelper(ld) {
+  rtl_lm(&s0, &id_src->addr, decinfo.width);
+  rtl_sr(id_dest->reg, &s0, 4);
+
+  switch (decinfo.width) {
+    case 4: print_asm_template2(lw); break;
+    case 2: print_asm_template2(lhu); break;
+    case 1: print_asm_template2(lbu); break;
+    default: assert(0);
+  }
+}
+
+make_EHelper(st) {
+  rtl_sm(&id_src->addr, &id_dest->val, decinfo.width);
+
+  switch (decinfo.width) {
+    case 4: print_asm_template2(sw); break;
+    case 2: print_asm_template2(sh); break;
+    case 1: print_asm_template2(sb); break;
+    default: assert(0);
+  }
+}
+
+make_EHelper(lh){
+  rtl_lm(&s0, &id_src->addr, 2);
+  rtl_sext(&s1, &s0, 2);
+  rtl_sr(id_dest->reg, &s1, 4);
+  print_asm_template2(lh);
+}
+
+make_EHelper(lb){
+  rtl_lm(&s0, &id_src->addr, 1);
+  rtl_sext(&s1, &s0, 1);
+  rtl_sr(id_dest->reg, &s1, 4);
+  print_asm_template2(lb);
+}
+
+```
+
+
+填写opcode_table如下
+
+```c
+#include "cpu/exec.h"
+#include "all-instr.h"
+
+static OpcodeEntry load_table [8] = {
+  EX(lb), EX(lh), EXW(ld, 4), EMPTY, EXW(ld,1), EXW(ld,2), EMPTY, EMPTY
+};
+
+static make_EHelper(load) {
+  decinfo.width = load_table[decinfo.isa.instr.funct3].width;
+  idex(pc, &load_table[decinfo.isa.instr.funct3]);
+}
+
+static OpcodeEntry store_table [8] = {
+  EXW(st,1), EXW(st,2), EXW(st, 4), EMPTY, EMPTY, EMPTY, EMPTY, EMPTY
+};
+
+static make_EHelper(store) {
+  decinfo.width = store_table[decinfo.isa.instr.funct3].width;
+  idex(pc, &store_table[decinfo.isa.instr.funct3]);
+}
+
+static OpcodeEntry opcode_table [32] = {
+  /* b00 */ IDEX(ld, load), EMPTY, EMPTY, EMPTY, IDEX(I, imm), IDEX(U, auipc), EMPTY, EMPTY,
+  /* b01 */ IDEX(st, store), EMPTY, EMPTY, EMPTY, IDEX(R, reg), IDEX(U, lui), EMPTY, EMPTY,
+  /* b10 */ EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+  /* b11 */ IDEX(B, branch), IDEX(I, jalr), EX(nemu_trap), IDEX(J, jal), EMPTY, EMPTY, EMPTY, EMPTY,
+};
+
+void isa_exec(vaddr_t *pc) {
+  decinfo.isa.instr.val = instr_fetch(pc, 4);
+  assert(decinfo.isa.instr.opcode1_0 == 0x3);
+  idex(pc, &opcode_table[decinfo.isa.instr.opcode6_2]);
+}
+
+```
+
+
+
+要完成ld-store还要完成rtl-sext 即寄存器扩展指令
+```c
+static inline void rtl_sext(rtlreg_t* dest, const rtlreg_t* src1, int width) {
+  // dest <- signext(src1[(width * 8 - 1) .. 0])
+  // TODO();
+  int32_t temp = *src1;
+  switch(width) {
+    case 4: *dest = *src1; return;
+    case 3: temp = temp <<  8; *dest = temp >>  8; return; 
+    case 2: temp = temp << 16; *dest = temp >> 16; return; 
+    case 1: temp = temp << 24; *dest = temp >> 24; return;
+    default: assert(0);
+  }
+}
+```
+
+
+![](./pa-img/res.png)
+
+完成所有指令后就差string测试无法通过。需要实现有关string的一系列函数。

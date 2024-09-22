@@ -148,7 +148,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -162,13 +162,14 @@
   },
   "active": "e47a2808b1453cc9",
   "lastOpenFiles": [
+    "pa-img/res.png",
+    "attachments",
+    "cow-trie/index.md",
     "pa-img/指示符.png",
     "pa-img/物理指令.png",
     "pa-img/伪指令.png",
-    "cow-trie/index.md",
     "pa-img/regs.png",
     "pa.md",
-    "attachments",
     "example/index.md",
     "pa-img/riscv32-zl.png",
     "pa-img",
