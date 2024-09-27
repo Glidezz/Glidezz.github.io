@@ -25,15 +25,27 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "pa.md",
+                "file": "pa1.md",
                 "mode": "source",
                 "backlinks": false,
                 "source": false
               }
             }
+          },
+          {
+            "id": "e8965176d2809528",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "pa2.md",
+                "mode": "source",
+                "source": false
+              }
+            }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -99,7 +111,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "pa.md",
+                "file": "pa2.md",
                 "collapseAll": false,
                 "extraContext": true,
                 "sortOrder": "alphabetical",
@@ -116,7 +128,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "pa.md",
+                "file": "pa2.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -139,7 +151,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "pa.md"
+                "file": "pa2.md"
               }
             }
           }
@@ -160,16 +172,17 @@
       "command-palette:打开命令面板": false
     }
   },
-  "active": "e47a2808b1453cc9",
+  "active": "e8965176d2809528",
   "lastOpenFiles": [
+    "pa1.md",
+    "pa2.md",
+    "cow-trie/index.md",
     "pa-img/res.png",
     "attachments",
-    "cow-trie/index.md",
     "pa-img/指示符.png",
     "pa-img/物理指令.png",
     "pa-img/伪指令.png",
     "pa-img/regs.png",
-    "pa.md",
     "example/index.md",
     "pa-img/riscv32-zl.png",
     "pa-img",
