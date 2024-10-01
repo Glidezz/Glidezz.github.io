@@ -18,11 +18,11 @@ type SocialLink = {
 }
 
 export const siteConfig: Config = {
-  title: "eliaukz",
+  title: "Glidezz",
   description: "",
   lang: "en-GB",
   profile: {
-    author: "eliaukz",
+    author: "glidezz",
     description: "hi everyone"
   }
 }
@@ -36,7 +36,7 @@ export const socialLinks: Array<SocialLink> = [
   {
     icon: "mdi:github",
     friendlyName: "Github",
-    link: "https://github.com/eliaukz",
+    link: "https://github.com/Glidezz",
   },
   // {
   //   icon: "mdi:linkedin",
@@ -46,7 +46,7 @@ export const socialLinks: Array<SocialLink> = [
   {
     icon: "mdi:email",
     friendlyName: "email",
-    link: "mailto:eliaukz07@gmail.com",
+    link: "mailto:Glidezz07@gmail.com",
   },
   {
     icon: "mdi:rss",

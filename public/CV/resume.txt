@@ -47,6 +47,6 @@ Skills
 Contact
 
 contact
-    Github https://github.com/Eliaukz
-    Blog https://eliaukz.github.io/
-    email eliaukz07@gmail.com
+    Github https://github.com/Glidezz
+    Blog https://Glidezz.github.io/
+    email Glidezz07@gmail.com
