@@ -43,9 +43,21 @@
                 "source": false
               }
             }
+          },
+          {
+            "id": "406ea8bd7fe70204",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "pa3.md",
+                "mode": "source",
+                "source": false
+              }
+            }
           }
         ],
-        "currentTab": 2
+        "currentTab": 3
       }
     ],
     "direction": "vertical"
@@ -111,7 +123,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "pa2.md",
+                "file": "pa3.md",
                 "collapseAll": false,
                 "extraContext": true,
                 "sortOrder": "alphabetical",
@@ -128,7 +140,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "pa2.md",
+                "file": "pa3.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -151,7 +163,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "pa2.md"
+                "file": "pa3.md"
               }
             }
           }
@@ -172,10 +184,11 @@
       "command-palette:打开命令面板": false
     }
   },
-  "active": "e8965176d2809528",
+  "active": "406ea8bd7fe70204",
   "lastOpenFiles": [
-    "pa1.md",
     "pa2.md",
+    "pa3.md",
+    "pa1.md",
     "cow-trie/index.md",
     "pa-img/res.png",
     "attachments",
