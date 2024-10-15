@@ -50,7 +50,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "pa3.md",
+                "file": "pa1.md",
                 "mode": "source",
                 "source": false
               }
@@ -123,7 +123,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "pa3.md",
+                "file": "pa1.md",
                 "collapseAll": false,
                 "extraContext": true,
                 "sortOrder": "alphabetical",
@@ -140,7 +140,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "pa3.md",
+                "file": "pa1.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -163,7 +163,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "pa3.md"
+                "file": "pa1.md"
               }
             }
           }
@@ -186,8 +186,8 @@
   },
   "active": "406ea8bd7fe70204",
   "lastOpenFiles": [
-    "pa2.md",
     "pa3.md",
+    "pa2.md",
     "pa1.md",
     "cow-trie/index.md",
     "pa-img/res.png",
